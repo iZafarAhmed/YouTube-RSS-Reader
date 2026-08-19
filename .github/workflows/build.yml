@@ -18,23 +18,20 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Generate Gradle wrapper
+      - name: Create Gradle wrapper
         run: |
-          mkdir -p /tmp/gradle-wrapper
-          cd /tmp/gradle-wrapper
           gradle wrapper --gradle-version 8.7
-          cp gradlew gradlew.bat "$GITHUB_WORKSPACE/"
-          mkdir -p "$GITHUB_WORKSPACE/gradle/wrapper"
-          cp -r gradle/wrapper/* "$GITHUB_WORKSPACE/gradle/wrapper/"
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
 
       - name: Build debug APK
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
