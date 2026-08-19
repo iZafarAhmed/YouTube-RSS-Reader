@@ -1,5 +1,7 @@
 package com.example.youtuberssreader
 
+import com.example.youtuberssreader.R  // <--- ADD THIS LINE
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
