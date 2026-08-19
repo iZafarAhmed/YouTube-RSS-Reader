@@ -1,7 +1,6 @@
 package com.example.youtuberssreader
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -21,9 +20,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.net.URL
+import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
 
@@ -32,6 +33,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var channelTitle: TextView
     private lateinit var channelInput: EditText
+    private lateinit var searchInput: EditText
 
     private val videoList = mutableListOf<Video>()
     private lateinit var videoAdapter: VideoAdapter
@@ -45,14 +47,35 @@ class MainActivity : AppCompatActivity() {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
 
+        // --- 1. SEARCH SECTION ---
+        searchInput = EditText(this).apply {
+            hint = "Search YouTube videos..."
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 32, 32, 16) }
+        }
+        rootLayout.addView(searchInput)
+
+        val btnSearch = Button(this).apply {
+            text = "Search"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 0, 32, 32) }
+        }
+        rootLayout.addView(btnSearch)
+
+        // --- 2. CHANNEL RSS SECTION ---
+        channelTitle = TextView(this).apply {
+            text = "Or load a Channel RSS Feed:"
+            textSize = 16f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 0, 32, 16) }
+        }
+        rootLayout.addView(channelTitle)
+
         channelInput = EditText(this).apply {
             hint = "Enter Channel ID"
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 32, 32, 16) }
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 0, 32, 16) }
         }
         rootLayout.addView(channelInput)
 
         val btnLoad = Button(this).apply {
-            text = "Load"
+            text = "Load Channel"
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 0, 32, 16) }
         }
         rootLayout.addView(btnLoad)
@@ -67,13 +90,14 @@ class MainActivity : AppCompatActivity() {
         btnRow.addView(btnJynxzi)
         rootLayout.addView(btnRow)
 
-        channelTitle = TextView(this).apply {
-            text = "Channel Title"
+        val statusTitle = TextView(this).apply {
+            text = "Results"
             textSize = 18f
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 16, 32, 16) }
         }
-        rootLayout.addView(channelTitle)
+        rootLayout.addView(statusTitle)
 
+        // --- 3. VIDEO LIST SECTION ---
         val frameLayout = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         }
@@ -97,11 +121,21 @@ class MainActivity : AppCompatActivity() {
         rootLayout.addView(frameLayout)
         setContentView(rootLayout)
 
+        // --- ADAPTER SETUP (Opens In-App Player) ---
         videoAdapter = VideoAdapter(videoList) { video ->
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + video.id)))
+            val intent = Intent(this, PlayerActivity::class.java)
+            intent.putExtra("VIDEO_ID", video.id)
+            startActivity(intent)
         }
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = videoAdapter
+
+        // --- CLICK LISTENERS ---
+        btnSearch.setOnClickListener {
+            val query = searchInput.text.toString().trim()
+            if (query.isNotEmpty()) searchVideos(query)
+            else Toast.makeText(this, "Enter search query", Toast.LENGTH_SHORT).show()
+        }
 
         btnLoad.setOnClickListener {
             val id = channelInput.text.toString().trim()
@@ -110,11 +144,60 @@ class MainActivity : AppCompatActivity() {
         }
         btnNba2k.setOnClickListener { loadChannel("UCW39zufHfsuGgpLviKh297Q") }
         btnJynxzi.setOnClickListener { loadChannel("UCjiXtODGCCulmhwypZAWSag") }
+        
         swipeRefresh.setOnRefreshListener { loadChannel(currentChannelId) }
 
         loadChannel(currentChannelId)
     }
 
+    // --- SEARCH LOGIC (Using Piped API) ---
+    private fun searchVideos(query: String) {
+        progressBar.visibility = View.VISIBLE
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val videos = withContext(Dispatchers.IO) { fetchSearchResults(query) }
+                videoList.clear()
+                videoList.addAll(videos)
+                videoAdapter.notifyDataSetChanged()
+                channelTitle.text = "Search results for: $query"
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Search error: " + e.message, Toast.LENGTH_LONG).show()
+            } finally {
+                progressBar.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
+            }
+        }
+    }
+
+    private fun fetchSearchResults(query: String): List<Video> {
+        val videos = mutableListOf<Video>()
+        val encodedQuery = URLEncoder.encode(query, "UTF-8")
+        // Piped API is a free proxy that searches YouTube without an API key
+        val url = URL("https://pipedapi.kavin.rocks/search?q=$encodedQuery&filter=videos")
+        val jsonString = url.readText()
+        val jsonObject = JSONObject(jsonString)
+        val items = jsonObject.getJSONArray("items")
+        
+        for (i in 0 until items.length()) {
+            val item = items.getJSONObject(i)
+            val urlPath = item.optString("url", "")
+            val id = urlPath.substringAfter("v=", "")
+            
+            if (id.isNotEmpty()) {
+                videos.add(Video(
+                    id = id,
+                    title = item.optString("title", ""),
+                    thumbnail = item.optString("thumbnail", ""),
+                    published = item.optString("uploadedDate", ""),
+                    views = item.optLong("views", 0).toString(),
+                    channelTitle = item.optString("uploaderName", "")
+                ))
+            }
+        }
+        return videos
+    }
+
+    // --- CHANNEL RSS LOGIC ---
     private fun loadChannel(channelId: String) {
         currentChannelId = channelId
         progressBar.visibility = View.VISIBLE
