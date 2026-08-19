@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
 
         videoAdapter = VideoAdapter(videoList) { video ->
             startActivity(Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://www.youtube.com/watch?v=${video.id}")))
+                Uri.parse("https://www.youtube.com/watch?v=" + video.id)))
         }
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = videoAdapter
@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
                 videoAdapter.notifyDataSetChanged()
                 binding.channelTitle.text = videos.firstOrNull()?.channelTitle ?: "No videos found"
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "Error: " + e.message, Toast.LENGTH_LONG).show()
             } finally {
                 binding.progressBar.visibility = View.GONE
                 binding.swipeRefresh.isRefreshing = false
