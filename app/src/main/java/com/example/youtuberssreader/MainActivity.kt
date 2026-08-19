@@ -20,9 +20,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
@@ -41,13 +43,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
 
-        // --- 1. SEARCH SECTION ---
         searchInput = EditText(this).apply {
             hint = "Search YouTube videos..."
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(32, 32, 32, 16) }
@@ -60,7 +61,6 @@ class MainActivity : AppCompatActivity() {
         }
         rootLayout.addView(btnSearch)
 
-        // --- 2. CHANNEL RSS SECTION ---
         channelTitle = TextView(this).apply {
             text = "Or load a Channel RSS Feed:"
             textSize = 16f
@@ -97,7 +97,6 @@ class MainActivity : AppCompatActivity() {
         }
         rootLayout.addView(statusTitle)
 
-        // --- 3. VIDEO LIST SECTION ---
         val frameLayout = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         }
@@ -105,7 +104,7 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh = SwipeRefreshLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         }
-        
+
         recyclerView = RecyclerView(this).apply {
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         }
@@ -121,7 +120,6 @@ class MainActivity : AppCompatActivity() {
         rootLayout.addView(frameLayout)
         setContentView(rootLayout)
 
-        // --- ADAPTER SETUP (Opens In-App Player) ---
         videoAdapter = VideoAdapter(videoList) { video ->
             val intent = Intent(this, PlayerActivity::class.java)
             intent.putExtra("VIDEO_ID", video.id)
@@ -130,7 +128,6 @@ class MainActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = videoAdapter
 
-        // --- CLICK LISTENERS ---
         btnSearch.setOnClickListener {
             val query = searchInput.text.toString().trim()
             if (query.isNotEmpty()) searchVideos(query)
@@ -144,13 +141,12 @@ class MainActivity : AppCompatActivity() {
         }
         btnNba2k.setOnClickListener { loadChannel("UCW39zufHfsuGgpLviKh297Q") }
         btnJynxzi.setOnClickListener { loadChannel("UCjiXtODGCCulmhwypZAWSag") }
-        
+
         swipeRefresh.setOnRefreshListener { loadChannel(currentChannelId) }
 
         loadChannel(currentChannelId)
     }
 
-    // --- SEARCH LOGIC (Using Piped API) ---
     private fun searchVideos(query: String) {
         progressBar.visibility = View.VISIBLE
         CoroutineScope(Dispatchers.Main).launch {
@@ -161,7 +157,7 @@ class MainActivity : AppCompatActivity() {
                 videoAdapter.notifyDataSetChanged()
                 channelTitle.text = "Search results for: $query"
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "Search error: " + e.message, Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "Search failed: " + e.message, Toast.LENGTH_LONG).show()
             } finally {
                 progressBar.visibility = View.GONE
                 swipeRefresh.isRefreshing = false
@@ -169,35 +165,84 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Tries 6 different servers until one works
     private fun fetchSearchResults(query: String): List<Video> {
+        val encoded = URLEncoder.encode(query, "UTF-8")
+        var lastError: Exception? = null
+
+        for (base in PIPED_INSTANCES) {
+            try {
+                val videos = searchPiped("$base/search?q=$encoded&filter=videos")
+                if (videos.isNotEmpty()) return videos
+            } catch (e: Exception) { lastError = e }
+        }
+
+        for (base in INVIDIOUS_INSTANCES) {
+            try {
+                val videos = searchInvidious(base, "$base/api/v1/search?q=$encoded&type=video")
+                if (videos.isNotEmpty()) return videos
+            } catch (e: Exception) { lastError = e }
+        }
+
+        throw lastError ?: Exception("All search servers are offline")
+    }
+
+    private fun searchPiped(url: String): List<Video> {
+        val json = JSONObject(httpGet(url))
+        val items = json.getJSONArray("items")
         val videos = mutableListOf<Video>()
-        val encodedQuery = URLEncoder.encode(query, "UTF-8")
-        // Piped API is a free proxy that searches YouTube without an API key
-        val url = URL("https://pipedapi.kavin.rocks/search?q=$encodedQuery&filter=videos")
-        val jsonString = url.readText()
-        val jsonObject = JSONObject(jsonString)
-        val items = jsonObject.getJSONArray("items")
-        
         for (i in 0 until items.length()) {
             val item = items.getJSONObject(i)
-            val urlPath = item.optString("url", "")
-            val id = urlPath.substringAfter("v=", "")
-            
-            if (id.isNotEmpty()) {
-                videos.add(Video(
-                    id = id,
-                    title = item.optString("title", ""),
-                    thumbnail = item.optString("thumbnail", ""),
-                    published = item.optString("uploadedDate", ""),
-                    views = item.optLong("views", 0).toString(),
-                    channelTitle = item.optString("uploaderName", "")
-                ))
-            }
+            val id = item.optString("url", "").substringAfter("v=", "")
+            if (id.isEmpty()) continue
+            videos.add(Video(
+                id = id,
+                title = item.optString("title", ""),
+                thumbnail = item.optString("thumbnail", ""),
+                published = item.optString("uploadedDate", ""),
+                views = item.optLong("views", 0).toString(),
+                channelTitle = item.optString("uploaderName", "")
+            ))
         }
         return videos
     }
 
-    // --- CHANNEL RSS LOGIC ---
+    private fun searchInvidious(base: String, url: String): List<Video> {
+        val arr = JSONArray(httpGet(url))
+        val videos = mutableListOf<Video>()
+        for (i in 0 until arr.length()) {
+            val item = arr.getJSONObject(i)
+            if (item.optString("type") != "video") continue
+            var thumb = ""
+            val thumbs = item.optJSONArray("thumbnails")
+            if (thumbs != null && thumbs.length() > 0) {
+                thumb = thumbs.getJSONObject(thumbs.length() - 1).optString("url", "")
+                if (thumb.startsWith("/")) thumb = base + thumb
+            }
+            videos.add(Video(
+                id = item.optString("videoId", ""),
+                title = item.optString("title", ""),
+                thumbnail = thumb,
+                published = item.optString("publishedText", ""),
+                views = item.optLong("viewCount", 0).toString(),
+                channelTitle = item.optString("author", "")
+            ))
+        }
+        return videos
+    }
+
+    private fun httpGet(url: String): String {
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 8000
+        conn.readTimeout = 8000
+        conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        try {
+            return conn.inputStream.bufferedReader().readText()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     private fun loadChannel(channelId: String) {
         currentChannelId = channelId
         progressBar.visibility = View.VISIBLE
@@ -247,5 +292,18 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) { throw e }
         return videos
+    }
+
+    companion object {
+        private val PIPED_INSTANCES = listOf(
+            "https://pipedapi.kavin.rocks",
+            "https://pipedapi.adminforge.de",
+            "https://pipedapi.reallyaweso.me"
+        )
+        private val INVIDIOUS_INSTANCES = listOf(
+            "https://inv.nadeko.net",
+            "https://invidious.f5.si",
+            "https://iv.melmac.space"
+        )
     }
 }
