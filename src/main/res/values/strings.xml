@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">YouTube RSS Reader</string>
+    <string name="hint_channel_id">Enter Channel ID</string>
+    <string name="btn_load">Load</string>
+    <string name="chip_nba2k">NBA 2K</string>
+    <string name="chip_jynxzi">Jynxzi</string>
+    <string name="error_empty_channel">Please enter a channel ID</string>
+    <string name="error_loading">Error loading feed</string>
+    <string name="watch_on_youtube">Watch on YouTube</string>
+    <string name="loading">Loading videos...</string>
+</resources>
