@@ -1,11 +1,9 @@
 package com.example.youtuberssreader
 
-import com.example.youtuberssreader.R  // <--- ADD THIS LINE
-
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
@@ -18,17 +16,55 @@ class VideoAdapter(
     private val onItemClick: (Video) -> Unit
 ) : RecyclerView.Adapter<VideoAdapter.VideoViewHolder>() {
 
-    class VideoViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val thumbnail: ImageView = view.findViewById(R.id.thumbnail)
-        val videoTitle: TextView = view.findViewById(R.id.videoTitle)
-        val videoDate: TextView = view.findViewById(R.id.videoDate)
-        val videoViews: TextView = view.findViewById(R.id.videoViews)
-    }
+    class VideoViewHolder(
+        val thumbnail: ImageView,
+        val videoTitle: TextView,
+        val videoDate: TextView,
+        val videoViews: TextView,
+        view: View
+    ) : RecyclerView.ViewHolder(view)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VideoViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_video, parent, false)
-        return VideoViewHolder(view)
+        val context = parent.context
+        
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            setPadding(16, 16, 16, 16)
+        }
+
+        val thumb = ImageView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 500)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+        root.addView(thumb)
+
+        val title = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 16 }
+            textSize = 16f
+            maxLines = 2
+        }
+        root.addView(title)
+
+        val metaRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = 8 }
+        }
+        
+        val date = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            textSize = 12f
+        }
+        metaRow.addView(date)
+
+        val views = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            textSize = 12f
+        }
+        metaRow.addView(views)
+        
+        root.addView(metaRow)
+        return VideoViewHolder(thumb, title, date, views, root)
     }
 
     override fun onBindViewHolder(holder: VideoViewHolder, position: Int) {
@@ -37,11 +73,7 @@ class VideoAdapter(
         holder.videoViews.text = formatViews(video.views)
         holder.videoDate.text = formatDate(video.published)
 
-        Glide.with(holder.itemView)
-            .load(video.thumbnail)
-            .centerCrop()
-            .into(holder.thumbnail)
-
+        Glide.with(holder.itemView).load(video.thumbnail).centerCrop().into(holder.thumbnail)
         holder.itemView.setOnClickListener { onItemClick(video) }
     }
 
@@ -68,8 +100,6 @@ class VideoAdapter(
                 diff < 604800000 -> "${diff / 86400000} days ago"
                 else -> SimpleDateFormat("MMM dd, yyyy", Locale.US).format(date)
             }
-        } catch (e: Exception) {
-            published
-        }
+        } catch (e: Exception) { published }
     }
 }
