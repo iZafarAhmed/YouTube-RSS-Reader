@@ -1,5 +1,7 @@
 package com.example.youtuberssreader
 
+import com.example.youtuberssreader.R  // <--- ADD THIS LINE
+
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
