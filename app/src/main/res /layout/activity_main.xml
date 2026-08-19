@@ -1,87 +1,53 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout 
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <com.google.android.material.appbar.AppBarLayout
+    <EditText
+        android:id="@+id/channelInput"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:hint="Enter Channel ID"
+        android:padding="8dp"/>
 
-        <com.google.android.material.appbar.MaterialToolbar
-            android:id="@+id/toolbar"
-            android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:background="@color/red"
-            app:title="YouTube RSS Reader"
-            app:titleTextColor="@android:color/white" />
-
-    </com.google.android.material.appbar.AppBarLayout>
+    <Button
+        android:id="@+id/btnLoad"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Load" />
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
-
-        <!-- Channel Input -->
-        <LinearLayout
-            android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+        <Button
+            android:id="@+id/btnNba2k"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="16dp">
-
-            <EditText
-                android:id="@+id/channelInput"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:hint="Enter Channel ID"
-                android:inputType="text" />
-
-            <Button
-                android:id="@+id/btnLoad"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="Load" />
-        </LinearLayout>
-
-        <!-- Quick Channels -->
-        <HorizontalScrollView
-            android:layout_width="match_parent"
+            android:text="NBA 2K" />
+        <Button
+            android:id="@+id/btnJynxzi"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:scrollbars="none">
+            android:text="Jynxzi" />
+    </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+    <TextView
+        android:id="@+id/channelTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Channel Title"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="8dp"/>
 
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/btnNba2k"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="8dp"
-                    android:text="NBA 2K" />
-
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/btnJynxzi"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Jynxzi" />
-            </LinearLayout>
-        </HorizontalScrollView>
-
-        <TextView
-            android:id="@+id/channelTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="16dp"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipeRefresh"
@@ -92,16 +58,14 @@
                 android:id="@+id/recyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent" />
-
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
-    </LinearLayout>
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+    </FrameLayout>
 
-    <ProgressBar
-        android:id="@+id/progressBar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:visibility="gone" />
-
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>
