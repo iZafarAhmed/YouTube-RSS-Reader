@@ -4,10 +4,15 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.youtuberssreader.databinding.ActivityMainBinding
+import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -18,38 +23,51 @@ import java.net.URL
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var progressBar: ProgressBar
+    private lateinit var channelTitle: TextView
+    private lateinit var channelInput: EditText
+
     private val videoList = mutableListOf<Video>()
     private lateinit var videoAdapter: VideoAdapter
     private var currentChannelId = "UCW39zufHfsuGgpLviKh297Q"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_main)
+
+        recyclerView = findViewById(R.id.recyclerView)
+        swipeRefresh = findViewById(R.id.swipeRefresh)
+        progressBar = findViewById(R.id.progressBar)
+        channelTitle = findViewById(R.id.channelTitle)
+        channelInput = findViewById(R.id.channelInput)
+        val btnLoad = findViewById<Button>(R.id.btnLoad)
+        val btnNba2k = findViewById<Button>(R.id.btnNba2k)
+        val btnJynxzi = findViewById<Button>(R.id.btnJynxzi)
 
         videoAdapter = VideoAdapter(videoList) { video ->
             startActivity(Intent(Intent.ACTION_VIEW,
                 Uri.parse("https://www.youtube.com/watch?v=" + video.id)))
         }
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.adapter = videoAdapter
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = videoAdapter
 
-        binding.btnLoad.setOnClickListener {
-            val id = binding.channelInput.text.toString().trim()
+        btnLoad.setOnClickListener {
+            val id = channelInput.text.toString().trim()
             if (id.isNotEmpty()) loadChannel(id)
             else Toast.makeText(this, "Enter a channel ID", Toast.LENGTH_SHORT).show()
         }
-        binding.btnNba2k.setOnClickListener { loadChannel("UCW39zufHfsuGgpLviKh297Q") }
-        binding.btnJynxzi.setOnClickListener { loadChannel("UCjiXtODGCCulmhwypZAWSag") }
-        binding.swipeRefresh.setOnRefreshListener { loadChannel(currentChannelId) }
+        btnNba2k.setOnClickListener { loadChannel("UCW39zufHfsuGgpLviKh297Q") }
+        btnJynxzi.setOnClickListener { loadChannel("UCjiXtODGCCulmhwypZAWSag") }
+        swipeRefresh.setOnRefreshListener { loadChannel(currentChannelId) }
 
         loadChannel(currentChannelId)
     }
 
     private fun loadChannel(channelId: String) {
         currentChannelId = channelId
-        binding.progressBar.visibility = View.VISIBLE
+        progressBar.visibility = View.VISIBLE
 
         CoroutineScope(Dispatchers.Main).launch {
             try {
@@ -57,19 +75,19 @@ class MainActivity : AppCompatActivity() {
                 videoList.clear()
                 videoList.addAll(videos)
                 videoAdapter.notifyDataSetChanged()
-                binding.channelTitle.text = videos.firstOrNull()?.channelTitle ?: "No videos found"
+                channelTitle.text = videos.firstOrNull()?.channelTitle ?: "No videos found"
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, "Error: " + e.message, Toast.LENGTH_LONG).show()
             } finally {
-                binding.progressBar.visibility = View.GONE
-                binding.swipeRefresh.isRefreshing = false
+                progressBar.visibility = View.GONE
+                swipeRefresh.isRefreshing = false
             }
         }
     }
 
     private fun fetchFeed(channelId: String): List<Video> {
         val videos = mutableListOf<Video>()
-        var channelTitle = ""
+        var channelTitleText = ""
 
         val parser = XmlPullParserFactory.newInstance().newPullParser()
         parser.setInput(URL("https://www.youtube.com/feeds/videos.xml?channel_id=$channelId").openStream(), "UTF-8")
@@ -83,7 +101,7 @@ class MainActivity : AppCompatActivity() {
                 val tag = parser.name ?: ""
                 when {
                     tag == "entry" -> { inEntry = true; video = Video() }
-                    tag == "title" && !inEntry -> channelTitle = parser.nextText()
+                    tag == "title" && !inEntry -> channelTitleText = parser.nextText()
                     tag == "title" && inEntry -> video.title = parser.nextText()
                     tag.endsWith("videoId") && inEntry -> video.id = parser.nextText()
                     tag.endsWith("thumbnail") && inEntry ->
@@ -92,7 +110,7 @@ class MainActivity : AppCompatActivity() {
                     tag.endsWith("statistics") && inEntry ->
                         video.views = parser.getAttributeValue(null, "views") ?: "0"
                 }
-                if (inEntry) video.channelTitle = channelTitle
+                if (inEntry) video.channelTitle = channelTitleText
             } else if (event == XmlPullParser.END_TAG) {
                 if (parser.name == "entry") {
                     videos.add(video)
