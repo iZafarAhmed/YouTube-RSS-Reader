@@ -3,12 +3,21 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="YouTube RSS"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+        android:usesCleartextTraffic="true">
+        
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <!-- NEW: In-App Player Activity -->
+        <activity 
+            android:name=".PlayerActivity" 
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:hardwareAccelerated="true" />
+            
     </application>
 </manifest>
